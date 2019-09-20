@@ -1,130 +1,133 @@
 # -*- encoding: utf-8
 
-"""
-Background Information:
-=======================
-
-When a pull request is opened, the heroku review app deployment status
-will be 502 until the app is deployed. Once deployed, the status 
-changes to 200/failure status.
-
-When the pull request is updated, a new review app is created and deployed on top
-of the existing review-app. Hence, until the new app is deployed the existing
-app returns PREVIOUS status.
-"""
-
+import json
+import logging
+import os
+import time
 from enum import Enum
 
-import json
-import os
-import logging
-import time
 import requests
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("review_app_status")
 
 
-class actions(Enum):
-    """Pull Request Actions"""
-
-    opened = "opened"
-    reopened = "reopened"
+SUCCESS = "success"  # Review App Success Build state
 
 
-class ReviewAppStatus:
-    """Tests the deploy status of a Heroku Review App
+def _make_github_api_request(url):
+    """Make github API request with `deployment` event specific headers.
 
-    Inputs:
-        timeout: action timeout in secs.
-        span: interval to check the status.
-        event_data: pull_request event data.
-        statuses_to_exclude: statuses which can be allowed.
+    Input:
+        url: URL to fetch.
+    Output:
+        JSON Response.
     """
+    headers = {
+        "Accept": "application/vnd.github.v3+json",
+        "Authorization": f"token {os.environ['GITHUB_TOKEN']}",
+    }
 
-    def __init__(self, timeout, span, event_data, statuses_to_exclude):
-        self.timeout = int(timeout)
-        self.span = int(span)
-        self.event_data = event_data
-        self.statuses_to_exclude = statuses_to_exclude
-        self.url = self._make_url()
+    r = requests.get(url, headers=headers)
+    r.raise_for_status()
+    return r.json()
 
-    def _make_url(self):
-        """Generates url from branch, pull request number and repository name"""
-        pull_request_number = self.event_data["number"]
-        github_repo_name = self.event_data["repository"]["name"]
-        heroku_app_name = os.environ.get("INPUT_HEROKU_APP_NAME")
 
-        app = heroku_app_name if heroku_app_name else github_repo_name
-        return f"https://{app}-pr-{pull_request_number}.herokuapp.com"
+def _get_github_deployment_status_url(deployments_url, commit_sha):
+    """Get deployment_status URL for the head commit.
+        Inputs:
+            deployments_url: This can be obtained from `pull_request` event payload.
+            commit_sha: SHA of head/latest commit. This also can be obtained from `pull_request` event payload.
+        Output:
+            Github deployment_status URL.
+    """
+    deployments = _make_github_api_request(deployments_url)
+    for deployment in deployments:
+        if deployment["sha"] == commit_sha:
+            return deployment["statuses_url"]
 
-    def opened_pull_request(self):
-        """Runs when the pull request is opened/Reopened.
+    raise ValueError("No deployment found for the lastest commit.")
+
+
+def _get_build_data(url, interval):
+    """Get Review App build data using Github's `deployment_status` API.
+    
+        Inputs:
+            url: Deployment status URL
+            interval: Amount of time (in seconds) to check the build status 
+                    if the status is in pending state.
         
-        The main purpose of having separate method for open pull request 
-        is to improve the time to fetch the result. 
-        """
-        while self.timeout > 0:
-            r = requests.get(self.url)
-            status = r.status_code
-            if status in self.statuses_to_exclude:
-                return
-            elif status in [404, 503]:  # client error and service unavailable
-                r.raise_for_status()
-            else:
-                logger.info(
-                    f"status of {self.url} is {status}. will retry after {self.span} sec"
-                )
-                time.sleep(self.span)
-                self.timeout = self.timeout - self.span
+        Output:
+            Review App build data
+    """
+    while True:
+        response = _make_github_api_request(url)
 
-        raise ValueError("Url Timeout")
+        # Heroku returns empty list until the build is Succeeded/Failed
+        if len(response) < 1:
+            logger.info(
+                f"Build Status is pending. Will check after {interval} seconds."
+            )
+            time.sleep(interval)
+            continue
 
-    def other_pull_request_actions(self):
-        """Runs for other pull request actions."""
-        logger.info(
-            f"App has been redeployed. Hence the action will wait for {self.timeout} seconds before fetching the status."
-        )
-
-        time.sleep(self.timeout)
-        r = requests.get(self.url)
-        status = r.status_code
-        if status in self.statuses_to_exclude:
-            logger.info(f"status of {self.url} is {status}.")
-        else:
-            r.raise_for_status()
+        # When the review app expires (depending on days specified in heroku)
+        # heroku returns an additional status with state `inactive`.
+        # As we are checking the status as soon as app is deployed, we can ignore this case.
+        if len(response) > 1:
+            logger.info(
+                f"Multiple Build Statuses found. Fetching the latest build status."
+            )
+        return response[0]
 
 
-if __name__ == "__main__":
-    """All the inputs are received from workflow as environment variables."""
+def _check_review_app_deployment_status(review_app_url, accepted_responses):
+    """Check Review App deployment status code against accepted_responses.
+    
+    Inputs:
+        review_app_url: URL of the Review App to be checked.
+        accepted_responses: status codes to be accepted.
+    """
+    time.sleep(5)  # Let the deployment breathe.
+    r = requests.get(review_app_url)
+    review_app_status = r.status_code
+    logger.info(f"Review app status: {review_app_status}")
+    if review_app_status not in accepted_responses:
+        r.raise_for_status()
 
-    timeout_arg = int(os.environ["INPUT_TIMEOUT"])
-    span_arg = int(os.environ["INPUT_SPAN"])
-    event_payload = os.environ["GITHUB_EVENT_PATH"]
-    statuses_arg = os.environ["INPUT_STATUSES"]
 
-    if span_arg > timeout_arg:
-        raise ValueError("span value should be less than timeout.")
+def main():
+    """Main workflow.
+    
+    All the inputs are received from workflow as environment variables.
+    """
+    interval_arg = int(os.environ["INPUT_INTERVAL"])
+    accepted_responses_arg = os.environ["INPUT_ACCEPTED_RESPONSES"]
+    event_payload_path = os.environ["GITHUB_EVENT_PATH"]
 
-    statuses_to_exclude = set(map(int, statuses_arg.split(",")))
+    logger.info(f"Statuses being accepted: {accepted_responses_arg}")
+    accepted_responses = set(map(int, accepted_responses_arg.split(",")))
 
-    logger.info(f"Statuses being excluded: {statuses_arg}")
-
-    with open(event_payload) as f:
+    with open(event_payload_path) as f:
         data = f.read()
-
     pull_request_data = json.loads(data)
 
-    reviewapp_status = ReviewAppStatus(
-        timeout_arg, span_arg, pull_request_data, statuses_to_exclude
+    github_deployment_status_url = _get_github_deployment_status_url(
+        pull_request_data["repository"]["deployments_url"],
+        pull_request_data["pull_request"]["head"]["sha"],
     )
-    action = pull_request_data["action"]
 
-    logger.info(f"Pull request Action: {action}")
+    reviewapp_build_data = _get_build_data(github_deployment_status_url, interval_arg)
 
-    if action in [actions.opened.value, actions.reopened.value]:
-        reviewapp_status.opened_pull_request()
-    else:
-        reviewapp_status.other_pull_request_actions()
+    if reviewapp_build_data["state"] != SUCCESS:
+        raise ValueError(f"Review App Build state: {reviewapp_build_data['state']}")
+
+    review_app_url = f"https://{reviewapp_build_data['environment']}.herokuapp.com"
+
+    _check_review_app_deployment_status(review_app_url, accepted_responses)
 
     print("Successful")
+
+
+if __name__ == "__main__":  # pragma: no cover
+    main()

@@ -1,27 +1,20 @@
 # Meta data for the action.
 
 name: 'Review App Deployment Status'
-author: 'Surya Teja'
-description: 'A github action for review app deployment status'
+author: 'niteo.co'
+description: 'A Github Action to test the deployment status of a Heroku Review App.'
 runs:
   using: 'docker'
   image: 'Dockerfile'
 inputs:
-  heroku_app_name:
-    description: (optional) The application name in the heroku.
-    required: false
-  timeout:
-    description: (optional) Github Action timeout in seconds.
-    required: false
-    default: 300 # 5 mins
-  span:
+  interval:
     description: (optional) Interval to check the status.
     required: false
-    default: 10 # 5 mins
-  statuses:
-    description: (optional) statuses which can be allowed. separated by comma.
+    default: 10 # 10 seconds
+  accepted_responses:
+    description: (optional) Status(es) which can be accepted. Separated by comma.
     required: false
-    default: 200 # All ok status
+    default: 200 # All OK status
 
 branding:
   icon: 'activity'  

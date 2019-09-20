@@ -1,0 +1,13 @@
+version: 2.0
+
+jobs:
+  build:
+    working_directory: ~/reviewapps-deploy-status
+    docker:
+      - image: circleci/python:3.7
+    steps:
+
+      - checkout
+      - run: sudo pip install -r requirements-dev.txt
+      - run: pytest --cov=review_app_status tests.py --cov-report term --cov-fail-under=100
+      # TODO: Validate action.yaml syntax

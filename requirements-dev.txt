@@ -1,0 +1,4 @@
+requests==2.22.0
+responses==0.10.6
+pytest==5.1.2
+pytest-cov==2.7.1
