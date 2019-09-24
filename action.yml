@@ -1,0 +1,21 @@
+# Meta data for the action.
+
+name: 'Review App Deployment Status'
+author: 'niteo.co'
+description: 'A Github Action to test the deployment status of a Heroku Review App.'
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+inputs:
+  interval:
+    description: (optional) Interval to check the status.
+    required: false
+    default: 10 # 10 seconds
+  accepted_responses:
+    description: (optional) Status(es) which can be accepted. Separated by comma.
+    required: false
+    default: 200 # All OK status
+
+branding:
+  icon: 'activity'  
+  color: 'green'
