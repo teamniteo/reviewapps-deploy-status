@@ -1,5 +1,8 @@
 # Review Apps deployment status
+[![CircleCI](https://circleci.com/gh/niteoweb/reviewapps-deploy-status/tree/master.svg?style=svg&circle-token=5ffcd6d51ad48e0b54dda7d8f37b158e5e502059)](https://circleci.com/gh/niteoweb/reviewapps-deploy-status/tree/master)
+
 A Github Action that tests the deployment status of a Heroku Review App.
+
 
 ## Usage:
 * Include the action in the workflow
