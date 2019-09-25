@@ -1,6 +1,6 @@
 FROM python:3.7-alpine
 
-LABEL version="1.0.0" \
+LABEL version="1.0.1" \
   repository="https://github.com/niteoweb/reviewapps-deploy-status" \
   homepage="https://github.com/niteoweb" \
   maintainer="niteo.co" \
