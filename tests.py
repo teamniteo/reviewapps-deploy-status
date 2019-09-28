@@ -54,6 +54,18 @@ def test_make_github_api_request_failure():
 
 
 @mock.patch("review_app_status._make_github_api_request")
+def test_get_deployment_status_interval_greater_failure(mock_github_request):
+
+    from review_app_status import _get_github_deployment_status_url
+
+    with pytest.raises(ValueError) as excinfo:
+        url = _get_github_deployment_status_url(
+            "https://foo.bar/deployments", "commitsha12345", 3, 4
+        )
+    assert "Interval can't be greater than deployments_timeout." in str(excinfo.value)
+
+
+@mock.patch("review_app_status._make_github_api_request")
 def test_get_deployment_status_url_success(mock_github_request):
 
     from review_app_status import _get_github_deployment_status_url
@@ -65,14 +77,14 @@ def test_get_deployment_status_url_success(mock_github_request):
         }
     ]
     url = _get_github_deployment_status_url(
-        "https://foo.bar/deployments", "commitsha12345"
+        "https://foo.bar/deployments", "commitsha12345", 2, 1
     )
     assert url == "https://foo.bar/deployment/statuses/1"
     mock_github_request.assert_called_once_with("https://foo.bar/deployments")
 
 
 @mock.patch("review_app_status._make_github_api_request")
-def test_get_deployment_status_url_failure(mock_github_request):
+def test_get_deployment_status_url_failure(mock_github_request, caplog):
 
     from review_app_status import _get_github_deployment_status_url
 
@@ -81,11 +93,48 @@ def test_get_deployment_status_url_failure(mock_github_request):
     ]
     with pytest.raises(ValueError) as excinfo:
         url = _get_github_deployment_status_url(
-            "https://foo.bar/deployments", "commitsha12345"
+            "https://foo.bar/deployments", "commitsha12345", 2, 1
         )
 
+    assert (
+        caplog.records[0].message
+        == "Waiting for deployments. Will check after 1 seconds."
+    )
     assert "No deployment found for the lastest commit." in str(excinfo.value)
-    mock_github_request.assert_called_once_with("https://foo.bar/deployments")
+    mock_github_request.call_count == 2
+
+
+@mock.patch(
+    "review_app_status._make_github_api_request",
+    side_effect=[
+        [],
+        [
+            {
+                "sha": "commitsha12345",
+                "statuses_url": "https://foo.bar/deployment/statuses/1",
+            }
+        ],
+    ],
+)
+def test_get_deployment_pending_status(mock_github_request, caplog):
+
+    from review_app_status import _get_github_deployment_status_url
+
+    url = _get_github_deployment_status_url(
+        "https://foo.bar/deployments", "commitsha12345", 2, 1
+    )
+
+    assert url == "https://foo.bar/deployment/statuses/1"
+    assert (
+        caplog.records[0].message
+        == "Waiting for deployments. Will check after 1 seconds."
+    )
+    assert mock_github_request.call_count == 2
+    expected = [
+        mock.call("https://foo.bar/deployments"),
+        mock.call("https://foo.bar/deployments"),
+    ]
+    assert mock_github_request.call_args_list == expected
 
 
 @mock.patch("review_app_status._make_github_api_request")
@@ -181,6 +230,7 @@ def test_check_review_app_custom_status_success(caplog):
 @mock.patch.dict(
     os.environ,
     {
+        "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
         "GITHUB_EVENT_PATH": "./test_path",
@@ -212,7 +262,7 @@ def test_main_success(
 
     mock_file.assert_called_with("./test_path")
     mock_deployment_status_url.assert_called_once_with(
-        "http://foo.bar/deployments", "commit12345"
+        "http://foo.bar/deployments", "commit12345", 20, 10
     )
     mock_build_data.assert_called_once_with("http://foo.bar/deployment_status", 10)
     mock_review_app_deployment.assert_called_once_with(
@@ -226,6 +276,7 @@ def test_main_success(
 @mock.patch.dict(
     os.environ,
     {
+        "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
         "GITHUB_EVENT_PATH": "./test_path",
@@ -254,7 +305,7 @@ def test_main_failure(
 
     mock_file.assert_called_with("./test_path")
     mock_deployment_status_url.assert_called_once_with(
-        "http://foo.bar/deployments", "commit12345"
+        "http://foo.bar/deployments", "commit12345", 20, 10
     )
     mock_build_data.assert_called_once_with("http://foo.bar/deployment_status", 10)
 

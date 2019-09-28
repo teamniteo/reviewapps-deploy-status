@@ -33,18 +33,29 @@ def _make_github_api_request(url):
     return r.json()
 
 
-def _get_github_deployment_status_url(deployments_url, commit_sha):
+def _get_github_deployment_status_url(deployments_url, commit_sha, timeout, interval):
     """Get deployment_status URL for the head commit.
         Inputs:
             deployments_url: This can be obtained from `pull_request` event payload.
             commit_sha: SHA of head/latest commit. This also can be obtained from `pull_request` event payload.
+            timeout: Maximum waiting time to fetch the deployments.
+            interval: Amount of time (in seconds) to check the deployments
+                    if the deployments are not available.
         Output:
             Github deployment_status URL.
     """
-    deployments = _make_github_api_request(deployments_url)
-    for deployment in deployments:
-        if deployment["sha"] == commit_sha:
-            return deployment["statuses_url"]
+
+    if interval > timeout:
+        raise ValueError("Interval can't be greater than deployments_timeout.")
+
+    while timeout > 0:
+        deployments = _make_github_api_request(deployments_url)
+        for deployment in deployments:
+            if deployment["sha"] == commit_sha:
+                return deployment["statuses_url"]
+        time.sleep(interval)
+        timeout = timeout - interval
+        logger.info(f"Waiting for deployments. Will check after {interval} seconds.")
 
     raise ValueError("No deployment found for the lastest commit.")
 
@@ -102,6 +113,7 @@ def main():
     All the inputs are received from workflow as environment variables.
     """
     interval_arg = int(os.environ["INPUT_INTERVAL"])
+    deployments_timeout_arg = int(os.environ["INPUT_DEPLOYMENTS_TIMEOUT"])
     accepted_responses_arg = os.environ["INPUT_ACCEPTED_RESPONSES"]
     event_payload_path = os.environ["GITHUB_EVENT_PATH"]
 
@@ -115,6 +127,8 @@ def main():
     github_deployment_status_url = _get_github_deployment_status_url(
         pull_request_data["repository"]["deployments_url"],
         pull_request_data["pull_request"]["head"]["sha"],
+        deployments_timeout_arg,
+        interval_arg,
     )
 
     reviewapp_build_data = _get_build_data(github_deployment_status_url, interval_arg)

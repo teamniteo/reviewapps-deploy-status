@@ -22,12 +22,13 @@ A Github Action that tests the deployment status of a Heroku Review App.
         
         steps:
         - name: Run review-app test
-          uses: niteoweb/reviewapps-deploy-status@v1.0.1
+          uses: niteoweb/reviewapps-deploy-status@v1.0.2
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
               interval: 10 # in seconds, optional, default is 10
               accepted_responses: 200 # comma separated status codes, optional, default is 200
+              deployments_timeout: 120 # in seconds, optional, default is 120
     ```
 
 > Note: Work flow should include `pull_request` event.
@@ -40,6 +41,7 @@ A Github Action that tests the deployment status of a Heroku Review App.
     |---|---|---|
     | interval | Wait for this amount of seconds before retrying the build check  | 10  |
     | accepted_responses | Allow/Accept the specified status codes | 200  |
+    | deployments_timeout | Maximum waiting time (in seconds) to fetch the deployments | 120 |
 
 ## Local Development
 * Create a Python virtual environment(version > 3.6).

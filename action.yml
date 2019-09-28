@@ -20,3 +20,7 @@ inputs:
     description: Status(es) which can be accepted. Separated by comma.
     required: false
     default: 200 # All OK status
+  deployments_timeout:
+    description: Maximum waiting time to fetch the deployments.
+    required: false
+    default: 120 # 120 seconds
