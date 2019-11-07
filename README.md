@@ -5,7 +5,7 @@
 A Github Action that tests the deployment status of a Heroku Review App.
 
 
-## Usage:
+## Usage
 * Include the action in the workflow
     ```yaml
     name: Review App Test
@@ -22,13 +22,16 @@ A Github Action that tests the deployment status of a Heroku Review App.
         
         steps:
         - name: Run review-app test
-          uses: niteoweb/reviewapps-deploy-status@v1.0.2
+          uses: niteoweb/reviewapps-deploy-status@v1.1.0
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
-              interval: 10 # in seconds, optional, default is 10
-              accepted_responses: 200 # comma separated status codes, optional, default is 200
-              deployments_timeout: 120 # in seconds, optional, default is 120
+              checks: build, response  # check the build status and if the app is responding properly
+              build_time_delay: 5  # delay the checks till the app is built, default is 5 seconds
+              load_time_delay: 5  # delay the checks till the app is loaded after build, default is 5 seconds
+              interval: 10  # interval to repeat checks, default is 10 seconds
+              accepted_responses: 200  # comma separated status codes, optional, default is 200
+              deployments_timeout: 120  # in seconds, optional, default is 120
     ```
 
 > Note: Work flow should include `pull_request` event.
@@ -39,9 +42,46 @@ A Github Action that tests the deployment status of a Heroku Review App.
 
     | Name | Description | Default | 
     |---|---|---|
+    | checks | Comma separated list of checks to be performed  | All checks: build, response  |
+    | build_time_delay | Delay for the build stage of the review app | 5  |
+    | load_time_delay | Delay for the app to load and start serving after it is built | 5  |
     | interval | Wait for this amount of seconds before retrying the build check  | 10  |
-    | accepted_responses | Allow/Accept the specified status codes | 200  |
+    | accepted_responses | Allow/Accept the specified status codes (comma separated) | 200  |
     | deployments_timeout | Maximum waiting time (in seconds) to fetch the deployments | 120 |
+
+
+## Workflow
+
+```
+Initialize
+├── Build time delay
+├── Fetch build data
+├── Is `build` check included in the `checks`?
+│   ├── Yes
+│   │   └── Is the build status a `success`?
+│   │       ├── Yes
+│   │       │   └── Continue
+│   │       └── No
+│   │           └── Are we past the `deployments_timeout`?
+│   │               ├── Yes
+│   │               │   └── Fail
+│   │               └── No
+│   │                   └── Repeat from `Fetch build data`
+│   └── No
+│       └── Continue
+├── Load time delay
+├── Is `response` check included in the `checks`?
+│   ├── Yes
+│   │   ├── Do an HTTP request to the app URL.
+│   │   └── Is the HTTP response in the `accepted_responses`?
+│   │       ├── Yes
+│   │       │   └── Continue
+│   │       └── No
+│   │           └── Fail
+│   └── No
+│       └── Continue
+└── Done (success)
+```
 
 ## Local Development
 * Create a Python virtual environment(version > 3.6).

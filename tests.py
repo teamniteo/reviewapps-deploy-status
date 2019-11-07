@@ -60,7 +60,10 @@ def test_get_deployment_status_interval_greater_failure(mock_github_request):
 
     with pytest.raises(ValueError) as excinfo:
         url = _get_github_deployment_status_url(
-            "https://foo.bar/deployments", "commitsha12345", 3, 4
+            deployments_url="https://foo.bar/deployments",
+            commit_sha="commitsha12345",
+            timeout=3,
+            interval=4,
         )
     assert "Interval can't be greater than deployments_timeout." in str(excinfo.value)
 
@@ -77,7 +80,10 @@ def test_get_deployment_status_url_success(mock_github_request):
         }
     ]
     url = _get_github_deployment_status_url(
-        "https://foo.bar/deployments", "commitsha12345", 2, 1
+        deployments_url="https://foo.bar/deployments",
+        commit_sha="commitsha12345",
+        timeout=2,
+        interval=1,
     )
     assert url == "https://foo.bar/deployment/statuses/1"
     mock_github_request.assert_called_once_with("https://foo.bar/deployments")
@@ -93,7 +99,10 @@ def test_get_deployment_status_url_failure(mock_github_request, caplog):
     ]
     with pytest.raises(ValueError) as excinfo:
         url = _get_github_deployment_status_url(
-            "https://foo.bar/deployments", "commitsha12345", 2, 1
+            deployments_url="https://foo.bar/deployments",
+            commit_sha="commitsha12345",
+            timeout=2,
+            interval=1,
         )
 
     assert (
@@ -154,7 +163,7 @@ def test_get_one_build_data_status(mock_github_request):
 def test_get_pending_build_data_status(mock_github_request, caplog):
     from review_app_status import _get_build_data
 
-    data = _get_build_data("https://foo.bar/deployments/1/status", 1)
+    data = _get_build_data(url="https://foo.bar/deployments/1/status", interval=1)
     assert data == {"id": "1"}
     assert (
         caplog.records[0].message
@@ -230,6 +239,9 @@ def test_check_review_app_custom_status_success(caplog):
 @mock.patch.dict(
     os.environ,
     {
+        "INPUT_CHECKS": "build, response",
+        "INPUT_BUILD_TIME_DELAY": "5",
+        "INPUT_LOAD_TIME_DELAY": "5",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
@@ -262,11 +274,16 @@ def test_main_success(
 
     mock_file.assert_called_with("./test_path")
     mock_deployment_status_url.assert_called_once_with(
-        "http://foo.bar/deployments", "commit12345", 20, 10
+        deployments_url="http://foo.bar/deployments",
+        commit_sha="commit12345",
+        timeout=20,
+        interval=10,
     )
-    mock_build_data.assert_called_once_with("http://foo.bar/deployment_status", 10)
+    mock_build_data.assert_called_once_with(
+        url="http://foo.bar/deployment_status", interval=10
+    )
     mock_review_app_deployment.assert_called_once_with(
-        "https://foo-pr-bar.herokuapp.com", {200, 302}
+        review_app_url="https://foo-pr-bar.herokuapp.com", accepted_responses=[200, 302]
     )
 
     out, err = capsys.readouterr()
@@ -276,6 +293,9 @@ def test_main_success(
 @mock.patch.dict(
     os.environ,
     {
+        "INPUT_CHECKS": "build, response",
+        "INPUT_BUILD_TIME_DELAY": "5",
+        "INPUT_LOAD_TIME_DELAY": "5",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
@@ -305,9 +325,14 @@ def test_main_failure(
 
     mock_file.assert_called_with("./test_path")
     mock_deployment_status_url.assert_called_once_with(
-        "http://foo.bar/deployments", "commit12345", 20, 10
+        deployments_url="http://foo.bar/deployments",
+        commit_sha="commit12345",
+        timeout=20,
+        interval=10,
     )
-    mock_build_data.assert_called_once_with("http://foo.bar/deployment_status", 10)
+    mock_build_data.assert_called_once_with(
+        url="http://foo.bar/deployment_status", interval=10
+    )
 
     "Review App Build state: failure" in str(excinfo.value)
     mock_review_app_deployment.assert_not_called()
