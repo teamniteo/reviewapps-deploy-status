@@ -12,15 +12,28 @@ runs:
   image: 'Dockerfile'
 
 inputs:
+  checks:
+    description: Comma separated list of checks to perform.
+    required: false
+    # Default: Perform all checks
+    default: build, response
+  build_time_delay:
+    description: Delay for the build stage of the review app.
+    required: false
+    default: 5
+  load_time_delay:
+    description: Delay for the app to load and start serving after it is built.
+    required: false
+    default: 5
   interval:
-    description: Interval to check the status.
+    description: Interval to repeat the deployment check in seconds.
     required: false
-    default: 10 # 10 seconds
+    default: 10
   accepted_responses:
-    description: Status(es) which can be accepted. Separated by comma.
+    description: Comma separated status which can be accepted.
     required: false
-    default: 200 # All OK status
+    default: 200
   deployments_timeout:
     description: Maximum waiting time to fetch the deployments.
     required: false
-    default: 120 # 120 seconds
+    default: 120
