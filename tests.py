@@ -201,7 +201,7 @@ def test_reviewapp_deployment_success(caplog):
 
     responses.add(responses.GET, "https://foo-pr-bar.com", status=200)
 
-    _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302])
+    _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302], 5, 5)
     assert len(responses.calls) == 1
     assert len(caplog.records) == 1
     assert caplog.records[0].message == "Review app status: 200"
@@ -213,15 +213,31 @@ def test_check_review_app_status_fail(caplog):
 
     responses.add(responses.GET, "https://foo-pr-bar.com", status=503)
 
-    with pytest.raises(exceptions.HTTPError) as excinfo:
-        _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302])
+    with pytest.raises(TimeoutError) as excinfo:
+        _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302], 5, 5)
 
     assert len(responses.calls) == 1
     assert (
-        "503 Server Error: Service Unavailable for url: https://foo-pr-bar.com/"
+        "Did not get any of the accepted status [200, 302] in the given time."
         in str(excinfo.value)
     )
     assert caplog.records[0].message == "Review app status: 503"
+
+
+@responses.activate
+def test_check_review_app_status_interval_greater_failure():
+
+    from review_app_status import _check_review_app_deployment_status
+
+    with pytest.raises(ValueError) as excinfo:
+        url = _check_review_app_deployment_status(
+            review_app_url="https://foo.bar",
+            accepted_responses=[200],
+            timeout=3,
+            interval=4,
+        )
+
+    assert "Interval can't be greater than publish_timeout." in str(excinfo.value)
 
 
 @responses.activate
@@ -230,7 +246,7 @@ def test_check_review_app_custom_status_success(caplog):
 
     responses.add(responses.GET, "https://foo-pr-bar.com", status=302)
 
-    _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302])
+    _check_review_app_deployment_status("https://foo-pr-bar.com", [200, 302], 5, 5)
     assert len(responses.calls) == 1
     assert len(caplog.records) == 1
     assert caplog.records[0].message == "Review app status: 302"
@@ -243,6 +259,7 @@ def test_check_review_app_custom_status_success(caplog):
         "INPUT_BUILD_TIME_DELAY": "5",
         "INPUT_LOAD_TIME_DELAY": "5",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
+        "INPUT_PUBLISH_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
         "GITHUB_EVENT_PATH": "./test_path",
@@ -283,7 +300,10 @@ def test_main_success(
         url="http://foo.bar/deployment_status", interval=10
     )
     mock_review_app_deployment.assert_called_once_with(
-        review_app_url="https://foo-pr-bar.herokuapp.com", accepted_responses=[200, 302]
+        review_app_url="https://foo-pr-bar.herokuapp.com",
+        accepted_responses=[200, 302],
+        timeout=20,
+        interval=10,
     )
 
     out, err = capsys.readouterr()
@@ -297,6 +317,7 @@ def test_main_success(
         "INPUT_BUILD_TIME_DELAY": "5",
         "INPUT_LOAD_TIME_DELAY": "5",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
+        "INPUT_PUBLISH_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
         "INPUT_ACCEPTED_RESPONSES": "200, 302",
         "GITHUB_EVENT_PATH": "./test_path",
