@@ -16,22 +16,36 @@ A Github Action that tests the deployment status of a Heroku Review App.
             - master
 
     jobs:
-    review-app-test:
+      review-app-test:
 
         runs-on: ubuntu-latest
         
         steps:
         - name: Run review-app test
-          uses: niteoweb/reviewapps-deploy-status@v1.1.0
+          uses: niteoweb/reviewapps-deploy-status@v1.2.0
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
-              checks: build, response  # check the build status and if the app is responding properly
-              build_time_delay: 5  # delay the checks till the app is built, default is 5 seconds
-              load_time_delay: 5  # delay the checks till the app is loaded after build, default is 5 seconds
-              interval: 10  # interval to repeat checks, default is 10 seconds
-              accepted_responses: 200  # comma separated status codes, optional, default is 200
-              deployments_timeout: 120  # in seconds, optional, default is 120
+            # Checks to be performed, default is all the checks
+            checks: build, response
+
+            # Delay for the application to be built in Heroku, default is 5 seconds
+            build_time_delay: 5
+
+            # Delay for the application to load and start serving, default is 5 seconds
+            load_time_delay: 5
+
+            # Interval for the repeating checks, default is 10 seconds
+            interval: 10
+
+            # Acceptable responses for the response check, default is 200
+            accepted_responses: 200
+
+            # Max time to be spent retrying for the build check, default is 120
+            deployments_timeout: 120
+
+            # Max time to be spent retrying for the response check, default is 120
+            publish_timeout: 120
     ```
 
 > Note: Work flow should include `pull_request` event.
@@ -42,12 +56,13 @@ A Github Action that tests the deployment status of a Heroku Review App.
 
     | Name | Description | Default | 
     |---|---|---|
-    | checks | Comma separated list of checks to be performed  | All checks: build, response  |
-    | build_time_delay | Delay for the build stage of the review app | 5  |
-    | load_time_delay | Delay for the app to load and start serving after it is built | 5  |
-    | interval | Wait for this amount of seconds before retrying the build check  | 10  |
-    | accepted_responses | Allow/Accept the specified status codes (comma separated) | 200  |
-    | deployments_timeout | Maximum waiting time (in seconds) to fetch the deployments | 120 |
+    | checks | Comma separated list of checks to be performed  | build, response |
+    | build_time_delay | Delay for the application to be built in Heroku | 5 |
+    | load_time_delay | Delay for the application to load and start serving | 5 |
+    | interval | Interval for the repeating checks (in seconds) | 10 |
+    | accepted_responses | Acceptable responses for the response check (comma separated) | 200  |
+    | deployments_timeout | Max time to be spent retrying for the build check (in seconds) | 120 |
+    | publish_timeout | Max time to be spent retrying for the response check (in seconds) | 120 |
 
 
 ## Workflow
@@ -74,10 +89,12 @@ Initialize
 │   ├── Yes
 │   │   ├── Do an HTTP request to the app URL.
 │   │   └── Is the HTTP response in the `accepted_responses`?
-│   │       ├── Yes
-│   │       │   └── Continue
 │   │       └── No
-│   │           └── Fail
+│   │           └── Are we past the `publish_timeout`?
+│   │               ├── Yes
+│   │               │   └── Fail
+│   │               └── No
+│   │                   └── Repeat from `Do an HTTP request to the app URL`
 │   └── No
 │       └── Continue
 └── Done (success)

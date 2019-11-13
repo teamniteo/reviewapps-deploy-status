@@ -43,14 +43,17 @@ class Args:
     # Delay for the application to load and start serving
     load_time_delay: int
 
-    # Interval between the repeating checks
+    # Interval for the repeating checks
     interval: int
 
     # Acceptable responses for the response check
     accepted_responses: t.List[int]
 
-    # Max time spend retrying for the build check.
-    deployments_timeout: t.List[int]
+    # Max time to be spent retrying for the build check
+    deployments_timeout: int
+
+    # Max time to be spent retrying for the response check
+    publish_timeout: int
 
 
 def _make_github_api_request(url: str) -> dict:
@@ -94,7 +97,7 @@ def _get_github_deployment_status_url(
             if deployment["sha"] == commit_sha:
                 return deployment["statuses_url"]
         time.sleep(interval)
-        timeout = timeout - interval
+        timeout -= interval
         logger.info(f"Waiting for deployments. Will check after {interval} seconds.")
 
     raise ValueError("No deployment found for the lastest commit.")
@@ -133,20 +136,31 @@ def _get_build_data(url: str, interval: int) -> dict:
 
 
 def _check_review_app_deployment_status(
-    review_app_url: str, accepted_responses: t.List[int]
+    review_app_url: str, accepted_responses: t.List[int], timeout: int, interval: int
 ):
     """Check Review App deployment status code against accepted_responses.
     
     Inputs:
         review_app_url: URL of the Review App to be checked.
-        accepted_responses: status codes to be accepted.
+        accepted_responses: Status codes to be accepted.
+        timeout: Maximum time to spend retrying the HTTP response check until it succeeds.
+        interval: Interval for each HTTP response check.
     """
-    time.sleep(5)  # Let the deployment breathe.
-    r = requests.get(review_app_url)
-    review_app_status = r.status_code
-    logger.info(f"Review app status: {review_app_status}")
-    if review_app_status not in accepted_responses:
-        r.raise_for_status()
+    if interval > timeout:
+        raise ValueError("Interval can't be greater than publish_timeout.")
+
+    while timeout > 0:
+        r = requests.get(review_app_url)
+        review_app_status = r.status_code
+        logger.info(f"Review app status: {review_app_status}")
+        if review_app_status in accepted_responses:
+            return
+        time.sleep(interval)
+        timeout -= interval
+
+    raise TimeoutError(
+        f"Did not get any of the accepted status {accepted_responses} in the given time."
+    )
 
 
 def main() -> None:
@@ -161,6 +175,7 @@ def main() -> None:
         load_time_delay=int(os.environ["INPUT_LOAD_TIME_DELAY"]),
         interval=int(os.environ["INPUT_INTERVAL"]),
         deployments_timeout=int(os.environ["INPUT_DEPLOYMENTS_TIMEOUT"]),
+        publish_timeout=int(os.environ["INPUT_PUBLISH_TIMEOUT"]),
         accepted_responses=[
             int(x.strip()) for x in os.environ["INPUT_ACCEPTED_RESPONSES"].split(",")
         ],
@@ -195,16 +210,19 @@ def main() -> None:
         build_state = reviewapp_build_data["state"]
         if build_state != BuildStates.success.value:
             raise ValueError(f"Review App Build state: {build_state}")
-        
+
     if Checks.response in args.checks:
         # Delay the checks till the app is loads
         logger.info(f"Load time delay: {args.load_time_delay} seconds")
         time.sleep(args.load_time_delay)
-        
+
         # Check the HTTP response from app URL
         review_app_url = f"https://{reviewapp_build_data['environment']}.herokuapp.com"
         _check_review_app_deployment_status(
-            review_app_url=review_app_url, accepted_responses=args.accepted_responses
+            review_app_url=review_app_url,
+            accepted_responses=args.accepted_responses,
+            timeout=args.publish_timeout,
+            interval=args.interval,
         )
 
     print("Successful")
