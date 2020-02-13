@@ -225,6 +225,7 @@ def main() -> None:
             interval=args.interval,
         )
 
+    print(f"::set-output name=review_app_url::{review_app_url}")
     print("Successful")
 
 

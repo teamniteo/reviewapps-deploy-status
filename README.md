@@ -22,7 +22,8 @@ A Github Action that tests the deployment status of a Heroku Review App.
         
         steps:
         - name: Run review-app test
-          uses: niteoweb/reviewapps-deploy-status@v1.2.0
+          id: review_app_test  # `id` value is used to refer the outputs from the corresponding action 
+          uses: niteoweb/reviewapps-deploy-status@v1.3.0
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
@@ -46,6 +47,11 @@ A Github Action that tests the deployment status of a Heroku Review App.
 
             # Max time to be spent retrying for the response check, default is 120
             publish_timeout: 120
+
+        # `steps.review_app_test.outputs.review_app_url` must be used in workflow to fetch the Review App URL 
+        - name: Check review_app_url
+          run: |
+            echo "Outputs - ${{ steps.review_app_test.outputs.review_app_url }}"
     ```
 
 > Note: Work flow should include `pull_request` event.

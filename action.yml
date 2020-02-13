@@ -41,3 +41,7 @@ inputs:
     description: Maximum time to spend retrying the HTTP response check until it succeeds.
     required: false
     default: 120
+
+outputs:
+  review_app_url:
+    description: "Review App URL from the action."
