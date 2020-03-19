@@ -309,6 +309,7 @@ def test_main_success(
     out, err = capsys.readouterr()
 
     "set-output name=review_app_url::https://foo-pr-bar.herokuapp.com" in out
+    "set-output name=review_app_name::foo-pr-bar" in out
     "Successful" in out
 
 
