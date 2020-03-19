@@ -216,8 +216,10 @@ def main() -> None:
         logger.info(f"Load time delay: {args.load_time_delay} seconds")
         time.sleep(args.load_time_delay)
 
+        review_app_name = reviewapp_build_data['environment']
+        review_app_url = f"https://{review_app_name}.herokuapp.com"
+
         # Check the HTTP response from app URL
-        review_app_url = f"https://{reviewapp_build_data['environment']}.herokuapp.com"
         _check_review_app_deployment_status(
             review_app_url=review_app_url,
             accepted_responses=args.accepted_responses,
@@ -225,6 +227,7 @@ def main() -> None:
             interval=args.interval,
         )
 
+    print(f"::set-output name=review_app_name::{review_app_name}")
     print(f"::set-output name=review_app_url::{review_app_url}")
     print("Successful")
 

@@ -43,5 +43,7 @@ inputs:
     default: 120
 
 outputs:
+  review_app_name:
+    description: "The name of the Heroku review app deployed."
   review_app_url:
-    description: "Review App URL from the action."
+    description: "The URL of the Heroku review app deployed."

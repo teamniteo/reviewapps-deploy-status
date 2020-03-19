@@ -51,7 +51,9 @@ A Github Action that tests the deployment status of a Heroku Review App.
         # `steps.review_app_test.outputs.review_app_url` must be used in workflow to fetch the Review App URL 
         - name: Check review_app_url
           run: |
-            echo "Outputs - ${{ steps.review_app_test.outputs.review_app_url }}"
+            echo "Outputs :"
+            echo "- App name: ${{ steps.review_app_test.outputs.review_app_name }}"
+            echo "- App url: ${{ steps.review_app_test.outputs.review_app_url }}"
     ```
 
 > Note: Work flow should include `pull_request` event.
