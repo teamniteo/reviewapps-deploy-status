@@ -23,7 +23,7 @@ A Github Action that tests the deployment status of a Heroku Review App.
         steps:
         - name: Run review-app test
           id: review_app_test  # `id` value is used to refer the outputs from the corresponding action 
-          uses: niteoweb/reviewapps-deploy-status@v1.3.0
+          uses: niteoweb/reviewapps-deploy-status@v1.4.0
           env:
               GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           with:
