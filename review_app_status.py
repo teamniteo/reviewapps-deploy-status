@@ -1,5 +1,3 @@
-# -*- encoding: utf-8
-
 import json
 import logging
 import os
@@ -33,6 +31,8 @@ class Checks(Enum):
 @dataclass(frozen=True)
 class Args:
     """User input arguments"""
+
+    url: t.Optional[str]
 
     # Checks to be performed
     checks: t.List[Checks]
@@ -76,7 +76,7 @@ def _make_github_api_request(url: str) -> dict:
 
 def _get_github_deployment_status_url(
     deployments_url: str, commit_sha: str, timeout: int, interval: int
-) -> None:
+) -> str:
     """Get deployment_status URL for the head commit.
         Inputs:
             deployments_url: This can be obtained from `pull_request` event payload.
@@ -170,6 +170,7 @@ def main() -> None:
     """
 
     args = Args(
+        url=os.environ.get("INPUT_URL"),
         checks=[Checks[x.strip()] for x in os.environ["INPUT_CHECKS"].split(",")],
         build_time_delay=int(os.environ["INPUT_BUILD_TIME_DELAY"]),
         load_time_delay=int(os.environ["INPUT_LOAD_TIME_DELAY"]),
@@ -181,11 +182,24 @@ def main() -> None:
         ],
     )
 
+    logger.info(f"Statuses being accepted: {args.accepted_responses}")
+
+    if args.url:
+        # Delay the checks till the app is loads
+        logger.info(f"Load time delay: {args.load_time_delay} seconds")
+        time.sleep(args.load_time_delay)
+        _check_review_app_deployment_status(
+            review_app_url=args.url,
+            accepted_responses=args.accepted_responses,
+            timeout=args.publish_timeout,
+            interval=args.interval,
+        )
+        print("Successful")
+        return None
+
     # Delay the checks till the app is built
     logger.info(f"Build time delay: {args.build_time_delay} seconds")
     time.sleep(args.build_time_delay)
-
-    logger.info(f"Statuses being accepted: {args.accepted_responses}")
 
     with open(os.environ["GITHUB_EVENT_PATH"]) as f:
         pull_request_data = json.load(f)
@@ -216,7 +230,7 @@ def main() -> None:
         logger.info(f"Load time delay: {args.load_time_delay} seconds")
         time.sleep(args.load_time_delay)
 
-        review_app_name = reviewapp_build_data['environment']
+        review_app_name = reviewapp_build_data["environment"]
         review_app_url = f"https://{review_app_name}.herokuapp.com"
 
         # Check the HTTP response from app URL
