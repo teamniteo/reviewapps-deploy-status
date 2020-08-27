@@ -256,8 +256,8 @@ def test_check_review_app_custom_status_success(caplog):
     os.environ,
     {
         "INPUT_CHECKS": "build, response",
-        "INPUT_BUILD_TIME_DELAY": "5",
-        "INPUT_LOAD_TIME_DELAY": "5",
+        "INPUT_BUILD_TIME_DELAY": "1",
+        "INPUT_LOAD_TIME_DELAY": "1",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_PUBLISH_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
@@ -317,8 +317,8 @@ def test_main_success(
     os.environ,
     {
         "INPUT_CHECKS": "build, response",
-        "INPUT_BUILD_TIME_DELAY": "5",
-        "INPUT_LOAD_TIME_DELAY": "5",
+        "INPUT_BUILD_TIME_DELAY": "1",
+        "INPUT_LOAD_TIME_DELAY": "1",
         "INPUT_DEPLOYMENTS_TIMEOUT": "20",
         "INPUT_PUBLISH_TIMEOUT": "20",
         "INPUT_INTERVAL": "10",
@@ -360,3 +360,80 @@ def test_main_failure(
 
     "Review App Build state: failure" in str(excinfo.value)
     mock_review_app_deployment.assert_not_called()
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "INPUT_URL": "https://foo.com",
+        "INPUT_CHECKS": "build, response",
+        "INPUT_BUILD_TIME_DELAY": "1",
+        "INPUT_LOAD_TIME_DELAY": "1",
+        "INPUT_DEPLOYMENTS_TIMEOUT": "20",
+        "INPUT_PUBLISH_TIMEOUT": "20",
+        "INPUT_INTERVAL": "10",
+        "INPUT_ACCEPTED_RESPONSES": "200, 302",
+        "GITHUB_EVENT_PATH": "./test_path",
+    },
+)
+@mock.patch("review_app_status._check_review_app_deployment_status")
+@mock.patch("review_app_status._get_github_deployment_status_url")
+@mock.patch("review_app_status._get_build_data")
+def test_main_success_verify_url(
+    mock_build_data, mock_deployment_status_url, mock_review_app_deployment, capsys,
+):
+    from review_app_status import main
+
+    main()
+
+    mock_review_app_deployment.assert_called_once_with(
+        review_app_url="https://foo.com",
+        accepted_responses=[200, 302],
+        timeout=20,
+        interval=10,
+    )
+    mock_deployment_status_url.assert_not_called()
+    mock_build_data.assert_not_called()
+
+    out, err = capsys.readouterr()
+
+    "Successful" in out
+
+
+@mock.patch.dict(
+    os.environ,
+    {
+        "INPUT_URL": "https://foo.com",
+        "INPUT_CHECKS": "build, response",
+        "INPUT_BUILD_TIME_DELAY": "1",
+        "INPUT_LOAD_TIME_DELAY": "1",
+        "INPUT_DEPLOYMENTS_TIMEOUT": "20",
+        "INPUT_PUBLISH_TIMEOUT": "20",
+        "INPUT_INTERVAL": "10",
+        "INPUT_ACCEPTED_RESPONSES": "200, 302",
+        "GITHUB_EVENT_PATH": "./test_path",
+    },
+)
+@mock.patch("review_app_status._check_review_app_deployment_status")
+@mock.patch("review_app_status._get_github_deployment_status_url")
+@mock.patch("review_app_status._get_build_data")
+def test_main_success_verify_url_failed(
+    mock_build_data, mock_deployment_status_url, mock_review_app_deployment, capsys,
+):
+    from review_app_status import main
+
+    mock_review_app_deployment.side_effect = TimeoutError("Timeout Error")
+
+    with pytest.raises(TimeoutError) as excinfo:
+        main()
+
+    mock_review_app_deployment.assert_called_once_with(
+        review_app_url="https://foo.com",
+        accepted_responses=[200, 302],
+        timeout=20,
+        interval=10,
+    )
+    mock_deployment_status_url.assert_not_called()
+    mock_build_data.assert_not_called()
+
+    "Timeout Error" in str(excinfo.value)

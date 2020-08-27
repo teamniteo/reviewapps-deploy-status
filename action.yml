@@ -12,6 +12,9 @@ runs:
   image: 'Dockerfile'
 
 inputs:
+  url:
+    description: App URL. If specified, skips Review App build check and verifies the status of the given URL.
+    required: false
   checks:
     description: Comma separated list of checks to perform.
     required: false
