@@ -101,7 +101,7 @@ A Github Action that tests the deployment status of a Heroku Review App.
 
   | Name                | Description                                                       | Default         |
   | ------------------- | ----------------------------------------------------------------- | --------------- |
-  | URL                 | URL to check the status (Optional)                                | -               |
+  | url                 | URL to check the status (Optional)                                | -               |
   | checks              | Comma separated list of checks to be performed                    | build, response |
   | build_time_delay    | Delay for the application to be built in Heroku                   | 5               |
   | load_time_delay     | Delay for the application to load and start serving               | 5               |
