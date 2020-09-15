@@ -32,8 +32,6 @@ class Checks(Enum):
 class Args:
     """User input arguments"""
 
-    url: t.Optional[str]
-
     # Checks to be performed
     checks: t.List[Checks]
 
@@ -170,7 +168,6 @@ def main() -> None:
     """
 
     args = Args(
-        url=os.environ.get("INPUT_URL"),
         checks=[Checks[x.strip()] for x in os.environ["INPUT_CHECKS"].split(",")],
         build_time_delay=int(os.environ["INPUT_BUILD_TIME_DELAY"]),
         load_time_delay=int(os.environ["INPUT_LOAD_TIME_DELAY"]),
@@ -183,19 +180,6 @@ def main() -> None:
     )
 
     logger.info(f"Statuses being accepted: {args.accepted_responses}")
-
-    if args.url:
-        # Delay the checks till the app is loads
-        logger.info(f"Load time delay: {args.load_time_delay} seconds")
-        time.sleep(args.load_time_delay)
-        _check_review_app_deployment_status(
-            review_app_url=args.url,
-            accepted_responses=args.accepted_responses,
-            timeout=args.publish_timeout,
-            interval=args.interval,
-        )
-        print("Successful")
-        return None
 
     # Delay the checks till the app is built
     logger.info(f"Build time delay: {args.build_time_delay} seconds")
@@ -218,7 +202,6 @@ def main() -> None:
     )
 
     # Perform all the checks now
-
     if Checks.build in args.checks:
         # Check if the build was success
         build_state = reviewapp_build_data["state"]
